@@ -52,7 +52,16 @@ class Application(QtGui.QMainWindow):
         self.initialise_gui_values()
         self.update_gui_values()
         self.idle = True
+        self.safe_to_exit = True
         self.write_app_status('application launched', colour='blue')
+        
+    def closeEvent(self, event):
+        if self.safe_to_exit:
+            self.save_gui_values()
+            event.accept()
+        else:
+            event.ignore()
+            self.message_unsafe_exit()            
         
     def setup_dropdowns(self):
         self.ui.a_distribution_cb.addItem('Exponential')
@@ -61,9 +70,11 @@ class Application(QtGui.QMainWindow):
         self.ui.a_ordering_cb.addItem('Random')
         
     def setup_gui_connections(self):
-        # hardware tab: iCCD
+        # hardware tab
         self.ui.h_iCCD_connect_btn.clicked.connect(self.exec_h_camera_connect_btn)
+        self.ui.h_iCCD_disconnect_btn.clicked.connect(self.exec_h_camera_disconnect_btn)
         self.ui.h_delaystage_connect_btn.clicked.connect(self.exec_h_delaystage_connect_btn)
+        self.ui.h_delaystage_disconnect_btn.clicked.connect(self.exec_h_delaystage_disconnect_btn)
         # acquisition tab: acquisition settings
         self.ui.a_exp_time_sb.valueChanged.connect(self.update_a_exp_time)
         self.ui.a_num_accum_sb.valueChanged.connect(self.update_a_num_accum)
@@ -102,12 +113,20 @@ class Application(QtGui.QMainWindow):
         self.ui.d_run_btn.clicked.connect(self.exec_d_run_btn)
         self.ui.d_stop_btn.clicked.connect(self.exec_d_stop_btn)
         self.ui.d_acquire_btn.clicked.connect(self.exec_d_single_acquisition_btn)
+        self.ui.d_abort_btn.clicked.connect(self.exec_d_abort_btn)
+        self.ui.d_exit_btn.clicked.connect(self.exec_exit_btn)
+        # acquisition tab: launch buttons
+        self.ui.a_run_btn.clicked.connect(self.exec_run_btn)
+        self.ui.a_stop_btn.clicked.connect(self.exec_stop_btn)
+        self.ui.a_exit_btn.clicked.connect(self.exec_exit_btn)
+        # spectrograph stuff
+        self.ui.d_central_wavelength_sb.valueChanged.connect(self.update_central_wavelength)
+        self.ui.d_slitwidth_sb.valueChanged.connect(self.update_slit_width)
         return
     
     def initialise_gui_values(self):
-        self.ui.h_iCCD_status.setText('no connection')
-        self.ui.h_delaystage_status.setText('no connection')
-        self.ui.d_autoscale_checkbox.setChecked(True)
+        self.ui.h_iCCD_status.setText('ready to connect')
+        self.ui.h_delaystage_status.setText('ready to connect')
         self.ui.d_current_time_sb.setValue(0)
         self.ui.a_sweep_progressbar.setValue(0)
         self.ui.a_measurement_progressbar.setValue(0)
@@ -121,7 +140,7 @@ class Application(QtGui.QMainWindow):
             self.ui.d_time_zero_sb.setValue(self.last_instance_values['time zero'])
             self.ui.a_distribution_cb.setCurrentIndex(self.last_instance_values['distribution'])
             self.ui.a_start_time_sb.setValue(self.last_instance_values['tstart'])
-            self.ui.a_end_time_sb.setValue(self.last_instance['tend'])
+            self.ui.a_end_time_sb.setValue(self.last_instance_values['tend'])
             self.ui.a_num_points_sb.setValue(self.last_instance_values['num tpoints'])
             self.ui.a_num_sweeps_sb.setValue(self.last_instance_values['num sweeps'])
             self.ui.a_ordering_cb.setCurrentIndex(self.last_instance_values['ordering'])
@@ -152,9 +171,9 @@ class Application(QtGui.QMainWindow):
         self.update_a_gain()
         self.update_a_gate_delay()
         self.update_a_gate_width()
-        self.update_central_wavelength()
         self.update_filepath()
-        self.update_kinetics_wavelength()
+        #self.update_kinetics_wavelength()
+        self.update_central_wavelength()
         self.update_metadata()
         self.update_time_zero()
         self.update_times()
@@ -180,7 +199,7 @@ class Application(QtGui.QMainWindow):
         self.last_instance_values['central wavelength'] = self.ui.d_central_wavelength_sb.value()
         self.last_instance_values['slit width'] = self.ui.d_slitwidth_sb.value()
         self.last_instance_values['wavelength monitored'] = self.ui.a_kinetic_wavelength_sb.value()
-        self.pl.to_csv(self.last_instance_filename, sep=':', header=False)
+        self.last_instance_values.to_csv(self.last_instance_filename, sep=':', header=False)
         
     def update_a_exp_time(self):
         self.exp_time = self.ui.a_exp_time_sb.value()
@@ -263,14 +282,35 @@ class Application(QtGui.QMainWindow):
         self.metadata['pump wavelength'] = self.ui.a_pump_wl_le.text()
         self.metadata['pump power'] = self.ui.a_pump_power_le.text()
         self.metadata['pump spot size'] = self.ui.a_spot_size_le.text()
-        
+    """    
     def update_kinetics_wavelength(self):
         self.kinetics_wavelength = self.ui.a_kinetic_wavelength_sb.value()
+        if self.camera_connected:
+            kinetics_pixel = int(self.camera.num_pixels*((self.kinetics_wavelength-self.wavelengths[0])/(self.wavelengths[-1]-self.wavelengths[0])))
+            self.kinetics_pixel = 0 if kinetics_pixel < 0 else kinetics_pixel
         return
+    """
+    def update_kinetics_wavelength(self):
+        self.kinetics_wavelength = self.wavelength_marker.value()
+        self.kinetics_pixel = int(self.camera.num_pixels*((self.kinetics_wavelength-self.wavelengths[0])/(self.wavelengths[-1]-self.wavelengths[0])))
+        if self.final_plots:
+            self.a_kinetics_plot()
+        return
+    
+    def update_time_pixel(self):
+        self.spectrum_time = self.time_marker.value()
+        self.time_pixel = np.where((self.times-self.spectrum_time)**2 == min((self.times-self.spectrum_time)**2))[0][0]
+        if self.final_plots:
+            self.a_spectrum_plot()
     
     def update_central_wavelength(self):
         self.central_wavelength = self.ui.d_central_wavelength_sb.value()
-        # move spectrograph
+        if self.camera_connected:
+            # move spectrograph
+            self.wavelengths = np.linspace(505, 805, self.camera.num_pixels)
+            # update plot x-axes
+            self.ui.d_spectrum_graph.setXRange(self.wavelengths[0], self.wavelengths[-1], padding=0)
+            self.ui.a_spectrum_graph.setXRange(self.wavelengths[0], self.wavelengths[-1], padding=0)
         return
     
     def update_slit_width(self):
@@ -344,7 +384,23 @@ class Application(QtGui.QMainWindow):
         self.ui.h_iCCD_status.setText('applying acquisition settings ...')
         self.apply_acquisition_settings()
         self.camera_connected = True
+        self.safe_to_exit = False
+        self.update_central_wavelength()
         self.ui.h_iCCD_status.setText('ready')
+        
+    def exec_h_camera_disconnect_btn(self):
+        self.ui.h_iCCD_status.setText('warming up iCCD - please wait ...')
+        self.camera.start_warmup()
+        current_temperature = self.camera.get_temperature()
+        while current_temperature < 0:
+            current_temperature = 21
+            self.update_iCCD_temperature_displays(current_temperature)
+        self.ui.h_iCCD_status.setText('disconnecting ...')
+        self.camera.ccdexit()
+        self.camera_connected = False
+        self.ui.h_iCCD_status.setText('ready to connect')
+        if not self.delaystage_connected:
+            self.safe_to_exit = True
         
     def apply_acquisition_settings(self):
         self.camera.exposure_time = self.exp_time
@@ -370,175 +426,70 @@ class Application(QtGui.QMainWindow):
         self.delaystage.move_to(0)
         self.delaystage_connected = True
         self.ui.h_delaystage_status.setText('ready')
+        
+    def exec_h_delaystage_disconnect_btn(self):
+        self.ui.h_delaystage_status.setText('closing connection ...')
+        self.delaystage.close()
+        self.delaystage_connected = False
+        self.ui.h_delaystage_status.setText('ready to connect')
+        if not self.camera_connected:
+            self.safe_to_exit = True
       
     def create_plots(self):
         self.ui.a_spectrum_graph.plotItem.setLabels(left='PL (counts)', bottom='Wavelength (nm)')
         self.ui.a_spectrum_graph.plotItem.showAxis('top', show=True)
+        self.ui.a_spectrum_graph.getAxis('top').style['showValues'] = False
         self.ui.a_spectrum_graph.plotItem.showAxis('right', show=True)
+        self.ui.a_spectrum_graph.getAxis('right').style['showValues'] = False        
         
         self.ui.a_kinetics_graph.plotItem.setLabels(left='PL (counts)', bottom='Time (ps)')
         self.ui.a_kinetics_graph.plotItem.showAxis('top', show=True)
+        self.ui.a_kinetics_graph.getAxis('top').style['showValues'] = False
         self.ui.a_kinetics_graph.plotItem.showAxis('right', show=True)
+        self.ui.a_kinetics_graph.getAxis('right').style['showValues'] = False
         
         self.ui.d_spectrum_graph.plotItem.setLabels(left='PL (counts)', bottom='Wavelength (nm)')
         self.ui.d_spectrum_graph.plotItem.showAxis('top', show=True)
+        self.ui.d_spectrum_graph.getAxis('top').style['showValues'] = False
         self.ui.d_spectrum_graph.plotItem.showAxis('right', show=True)
+        self.ui.d_spectrum_graph.getAxis('right').style['showValues'] = False
         return
     
     def d_spectrum_plot(self):
-        self.ui.d_spectrum_graph.plotItem.plot(self.current_data[:, 0], self.current_data[:, 1], pen='r', clear=True)
+        self.ui.d_spectrum_graph.plotItem.plot(self.wavelengths, self.current_spectrum, pen='b', clear=True)
+        return
+      
+    def a_colourmap_plot(self):
+        self.ui.a_colourmap_graph.setImage(self.current_sweep.avg_data, scale=(len(self.wavelengths)/len(self.times), 1))
+        return
+   
+    def a_kinetics_plot(self):
+        if self.current_sweep.sweep_index > 0 and not self.final_plots:
+            self.ui.a_kinetics_graph.plotItem.plot(self.times[0:self.timestep+1], self.current_sweep.current_data[0:self.timestep+1, self.kinetics_pixel], pen='c', symbol='s', symbolPen='c', symbolBrush=None, symbolSize=4, clear=True)
+            self.ui.a_kinetics_graph.plotItem.plot(self.times, self.current_sweep.avg_data[:, self.kinetics_pixel], pen='b', symbol='s', symbolPen='b', symbolBrush=None, symbolSize=4, clear=False)
+        elif self.current_sweep.sweep_index == 0 and not self.final_plots:
+            self.ui.a_kinetics_graph.plotItem.plot(self.times[0:self.timestep+1], self.current_sweep.current_data[0:self.timestep+1, self.kinetics_pixel], pen='c', symbol='s', symbolPen='c', symbolBrush=None, symbolSize=4, clear=True)
+        else:
+            for item in self.ui.a_kinetics_graph.plotItem.listDataItems():
+                self.ui.a_kinetics_graph.plotItem.removeItem(item)
+            self.ui.a_kinetics_graph.plotItem.plot(self.times, self.current_sweep.avg_data[:, self.kinetics_pixel], pen='b', symbol='s', symbolPen='b', symbolBrush=None, symbolSize=4)
+        return
+   
+    def a_spectrum_plot(self):
+        for item in self.ui.a_spectrum_graph.plotItem.listDataItems():
+            self.ui.a_spectrum_graph.plotItem.removeItem(item)
+        if self.final_plots:
+            self.ui.a_spectrum_graph.plotItem.plot(self.wavelengths, self.current_sweep.avg_data[self.time_pixel, :], pen='b')
+        else:
+            self.ui.a_spectrum_graph.plotItem.plot(self.wavelengths, self.current_spectrum, pen='b')
         return
     
-    """    
-    def region_updated(self,regionItem):
-        px1,px2 = regionItem.getRegion()
-        self.ui.d_vline1.display(px1)
-        self.ui.d_vline2.display(px2)
-        return
-        
-    def create_plot_waves_and_times(self):
-        '''updates all plots within the gui. Note that it will only plot the ones
-           that are displayed. When an acquisition is running, it is possible to
-           switch between the acquire and diagnostics tab and the plots will update
-           accordingly'''
-        self.waves = self.pixels_to_waves()
-        if self.use_calib is True:
-            self.plot_waves = self.pixels_to_waves()
-        else:
-            self.plot_waves = np.linspace(0,self.num_pixels-1,self.num_pixels)
-        
-        if self.use_actual_times is True:
-            self.plot_times = self.times
-        else:
-            self.plot_times = np.linspace(0,self.times.size-1,self.times.size)
-        
-        if self.use_logscale is True:
-            self.plot_times = np.log10(self.plot_times)
-            
-        self.ui.kinetic_wave.display(self.plot_waves[self.kinetic_pixel])
-        self.ui.spectra_time.display(self.plot_times[self.spectra_timestep])
-        
-        if self.diagnostics_on is False:
-            self.plot_dtt = self.current_sweep.avg_data[:]
-        self.plot_ls = self.current_data.dtt[:]
-        self.plot_probe_shot_error = self.current_data.probe_shot_error[:]
-        if self.ui.d_use_reference.isChecked() is True:
-            self.plot_ref_shot_error = self.current_data.ref_shot_error[:]
-            self.plot_dtt_error = self.current_data.dtt_error[:]
-        self.plot_probe_on = self.current_data.probe_on[:]
-        self.plot_reference_on = self.current_data.reference_on[:]
-        self.plot_probe_on_array = self.current_data.probe_on_array[:]
-        self.plot_reference_on_array = self.current_data.reference_on_array[:]
-        if self.use_cutoff is True:
-            self.plot_waves = self.plot_waves[self.cutoff[0]:self.cutoff[1]]
-            if self.diagnostics_on is False:
-                self.plot_dtt = self.plot_dtt[:,self.cutoff[0]:self.cutoff[1]]
-            self.plot_ls = self.plot_ls[self.cutoff[0]:self.cutoff[1]]
-            self.plot_probe_shot_error = self.plot_probe_shot_error[self.cutoff[0]:self.cutoff[1]]
-            if self.ui.d_use_reference.isChecked() is True:
-                self.plot_ref_shot_error = self.plot_ref_shot_error[self.cutoff[0]:self.cutoff[1]]
-                self.plot_dtt_error = self.plot_dtt_error[self.cutoff[0]:self.cutoff[1]]
-            self.plot_probe_on = self.plot_probe_on[self.cutoff[0]:self.cutoff[1]]
-            self.plot_reference_on = self.plot_reference_on[self.cutoff[0]:self.cutoff[1]]
-            self.plot_probe_on_array = self.plot_probe_on_array[:,self.cutoff[0]:self.cutoff[1]]
-            self.plot_reference_on_array = self.plot_reference_on_array[:,self.cutoff[0]:self.cutoff[1]]        
-        return
-        
-    def pixels_to_waves(self):
-        '''uses calibration values to transform pixels to wavelength values'''
-        slope = (self.calib[3]-self.calib[2])/(self.calib[1]-self.calib[0])
-        y_int = self.calib[2]-slope*self.calib[0]
-        return np.linspace(0,self.num_pixels-1,self.num_pixels)*slope+y_int
-                
-    def ls_plot(self):
-        '''last shot plot on acquire tab'''
-        try:
-            self.ui.last_shot_graph.plotItem.plot(self.plot_waves,self.plot_ls,clear=True,pen='b')
-        except:
-            self.append_history('Error Plotting Last Shot')
-        return
-        
-    def top_plot(self):
-        '''top plot on acquire tab'''
-        try:
-            self.ui.top_graph.setImage(self.plot_dtt,scale=(len(self.plot_waves)/len(self.plot_times),1))
-        except:
-            self.append_history('Error Plotting Top Plot')
-        return
-        
-    def kin_plot(self):
-        '''kinetic plot on acquire tab'''
-        self.update_kinetic_pixel()
-        if self.use_logscale is True:
-            plot_times = self.plot_times[np.isfinite(self.plot_times)]
-        else:
-            plot_times = self.plot_times
-        try:
-            kinetic_pixel_index = self.kinetic_pixel if not self.use_cutoff else self.kinetic_pixel-self.cutoff[0]
-            self.ui.kinetic_graph.plotItem.plot(plot_times, self.plot_dtt[np.isfinite(self.plot_times), kinetic_pixel_index], pen='r', clear=True)
-        except:
-            self.append_history('Error Plotting Kinetic Plot')
-        return
-        
-    def spec_plot(self):
-        '''spectra plot on acquire tab'''
-        self.update_spectra_timestep()
-        try:
-            self.ui.spectra_graph.plotItem.plot(self.plot_waves,self.plot_dtt[self.spectra_timestep,:],pen='g',clear=True)
-        except:
-            self.append_history('Error Plotting Spectra Plot')
-        return
-        
-    def d_error_plot(self):
-        '''error plot on diagnostics tab'''
-        try:
-            self.ui.d_error_graph.plotItem.plot(self.plot_waves,np.log10(self.plot_probe_shot_error),pen='r',clear=True,fillBrush='r')
-            if self.ui.d_use_reference.isChecked() is True:         
-                self.ui.d_error_graph.plotItem.plot(self.plot_waves,np.log10(self.plot_ref_shot_error),pen='g',clear=False,fillBrush='g')    
-                self.ui.d_error_graph.plotItem.plot(self.plot_waves,np.log10(self.plot_dtt_error),pen='b',clear=False,fillBrush='b')
-        except:
-            self.append_history('Error plotting error!')
-        self.ui.d_error_graph.plotItem.setYRange(-4,1,padding=0)
-        return
-        
-    def d_trigger_plot(self):
-        '''trigger plot on diagnostics tab'''
-        try:
-            self.ui.d_trigger_graph.plotItem.plot(np.arange(self.num_shots),self.current_data.trigger,pen=None,symbol='o',clear=True)
-        except:
-            self.append_history('Error Plotting Trigger')
-        return
-        
-    def d_probe_ref_plot(self):
-        '''probe and reference spectra plot on diagnostics tab'''
-        for item in self.ui.d_probe_ref_graph.plotItem.listDataItems():
-            self.ui.d_probe_ref_graph.plotItem.removeItem(item)
-        try:
-            if self.ui.d_display_mode.currentIndex() == 0:
-                self.ui.d_probe_ref_graph.plotItem.plot(self.plot_waves,self.plot_probe_on,pen='r')
-                if self.ui.d_use_reference.isChecked() is True:
-                    self.ui.d_probe_ref_graph.plotItem.plot(self.plot_waves,self.plot_reference_on,pen='b')
-            if self.ui.d_display_mode.currentIndex() == 1:
-                if self.ui.d_display_mode_spectra.currentIndex() == 0:
-                    for spec in self.plot_probe_on_array:
-                        self.ui.d_probe_ref_graph.plotItem.plot(self.plot_waves,spec,pen='r')
-                if self.ui.d_display_mode_spectra.currentIndex() == 1:
-                    for spec in self.plot_reference_on_array:
-                        self.ui.d_probe_ref_graph.plotItem.plot(self.plot_waves,spec,pen='b')
-        except:
-            self.append_history('Error Plotting Probe and/or Reference Spectra')
-        return
-        
-    def d_ls_plot(self):
-        '''last shot plot on diagnostics tab'''
-        try:
-            self.ui.d_last_shot_graph.plotItem.plot(self.plot_waves,self.plot_ls,pen='b',clear=True)
-        except:
-            self.append_history('Error Plotting Last Shot')
-        return
-        
-
-    """
+    def add_time_marker(self):
+        self.time_marker = pg.InfiniteLine(self.times[int(len(self.times)/2)], movable=True, bounds=[min(self.times), max(self.times)])
+        self.ui.a_kinetics_graph.addItem(self.time_marker)
+        self.time_marker.sigPositionChangeFinished.connect(self.update_time_pixel)
+        self.time_marker_label = pg.InfLineLabel(self.time_marker, text='{value:.2f}ps', movable=True, position=0.9)
+        self.update_time_pixel()
         
     def message_block(self):
         msg = QtGui.QMessageBox()
@@ -564,6 +515,15 @@ class Application(QtGui.QMainWindow):
         msg.setStandardButtons(QtGui.QMessageBox.Ok)
         retval = msg.exec_()
         return retval
+    
+    def message_unsafe_exit(self):
+        msg = QtGui.QMessageBox()
+        msg.setIcon(QtGui.QMessageBox.Information)
+        msg.setText('cannot close application')
+        msg.setInformativeText('stop acquisition and disconnect from hardware')
+        msg.setStandardButtons(QtGui.QMessageBox.Ok)
+        retval = msg.exec_()
+        return retval
         
     def message_error_saving(self):
         msg = QtGui.QMessageBox()
@@ -582,61 +542,22 @@ class Application(QtGui.QMainWindow):
         self.idle = True
         # enable / disable stuff
         return
-    
-    """    
+
     def acquire(self):
-        '''acquire data from camera'''
-        self.append_history('Acquiring '+str(self.num_shots)+' shots')
-        self.camera.start_acquire.emit()  # connects to the Acquire signal in the camera class, which results in a signal data_ready being emitted containing the data from probe and reference. This signal connects to post_acquire method, which loops back to acquire
+        self.acquisition.start_acquire.emit()
         return
-        
-    def post_acquire(self,probe,reference,first_pixel,num_pixels):
-        '''process ta data according to functions found in ta_data_processing.py'''
-        try:
-            self.current_data.update(probe,
-                                     reference,
-                                     first_pixel,
-                                     num_pixels)
-        except:
-             self.current_data = taDataProcessing(probe,
-                                                  reference,
-                                                  first_pixel,
-                                                  num_pixels)
-        if self.ui.d_use_linear_corr.isChecked():
-            try:
-                self.current_data.linear_pixel_correlation(self.linear_corr)
-            except:
-                self.append_history('Error using linear pixel correction')
-        self.high_trig_std = self.current_data.separate_on_off(self.threshold,self.tau_flip_request)
-        if self.ui.test_run_btn.isChecked() is False:
-            self.current_data.sub_bgd(self.bgd)
-        if self.ui.d_use_ref_manip.isChecked() is True:
-            self.current_data.manipulate_reference(self.refman)
-        self.current_data.average_shots()
-        if self.ui.d_use_reference.isChecked() is True:
-            self.current_data.correct_probe_with_reference()
-            self.current_data.average_refd_shots()
-            self.high_dtt = self.current_data.calcuate_dtt(use_reference=True,cutoff=self.cutoff,use_avg_off_shots=self.ui.d_use_avg_off_shots.isChecked(),max_dtt=np.abs(self.ui.d_max_dtt.value()))
-            self.current_data.calculate_dtt_error(use_reference=True,use_avg_off_shots=self.ui.d_use_avg_off_shots.isChecked())
-        else:
-            self.high_dtt = self.current_data.calcuate_dtt(use_reference=False,cutoff=self.cutoff,use_avg_off_shots=self.ui.d_use_avg_off_shots.isChecked(),max_dtt=np.abs(self.ui.d_max_dtt.value()))
-            self.current_data.calculate_dtt_error(use_reference=False,use_avg_off_shots=self.ui.d_use_avg_off_shots.isChecked())
-        if (self.high_trig_std is False) and (self.high_dtt is False):
-            self.current_sweep.add_current_data(self.current_data.dtt,time_point=self.timestep)
-        else:
-            self.append_history('Did not add last point')
-        self.create_plot_waves_and_times()
-        if self.ui.acquire_tab.isVisible() is True:
-            self.ls_plot()
-            self.top_plot()
-            self.kin_plot()
-            self.spec_plot()
-        if self.ui.diagnos_tab.isVisible() is True:
-            self.d_ls_plot()
-            self.d_error_plot()
-            self.d_trigger_plot()
-            self.d_probe_ref_plot()
-        
+   
+    def post_acquire(self, spectrum):
+        self.current_spectrum = spectrum#-self.bgd
+        self.current_sweep.add_current_data(self.current_spectrum, self.timestep)
+        # update plots
+        if self.ui.acquisition_tab.isVisible() is True:
+            self.a_colourmap_plot()
+            self.a_spectrum_plot()
+            self.a_kinetics_plot()
+        if self.ui.diagnostics_tab.isVisible() is True:
+            self.d_spectrum_plot()
+        # stopping
         if self.stop_request is True:
             self.finish()
         elif self.timestep == len(self.times)-1:
@@ -644,159 +565,125 @@ class Application(QtGui.QMainWindow):
         else:
             self.timestep = self.timestep+1
             self.time = self.times[self.timestep]
-            self.ui.time_display.display(self.time)
-            self.ui.progressBar.setValue(self.timestep+1)
+            self.ui.a_current_time_lcd.display(self.time)
+            self.ui.a_sweep_progressbar.setValue(self.timestep+1)
+            self.ui.a_measurement_progressbar.setValue(self.current_sweep.sweep_index*len(self.times)+self.timestep+1)
             self.move(self.time)
             self.acquire()
         return
-   
+
     def acquire_bgd(self):
-        '''acquire data from camera for background - increases shots by 10x'''
-        self.append_history('Acquiring '+str(self.num_shots*10)+' shots')
-        self.camera.start_acquire.emit()
+        self.acquisition.start_acquire.emit()
         return
         
-    def post_acquire_bgd(self,probe,reference,first_pixel,num_pixels):      
-        '''process background data'''
+    def post_acquire_bgd(self, spectrum):
+        self.bgd = spectrum
         self.message_unblock()
-        self.bgd = taDataProcessing(probe,
-                                    reference,
-                                    first_pixel,
-                                    num_pixels)
-        if self.ui.d_use_linear_corr.isChecked():
-            try:
-                self.bgd_data.linear_pixel_correlation(self.linear_corr)
-            except:
-                self.append_history('Error using linear pixel correction')
-        self.bgd.separate_on_off(self.threshold)
-        self.bgd.average_shots() 
-        self.camera.Exit()
         self.run()          
-        return    
-    
+        return
+
     def exec_run_btn(self):
-        '''executes when run on aquire tab is pressed, if test mode is selected
-           data will not be saved. This function loops over the number of sweeps'''
-        if self.ui.test_run_btn.isChecked() is True:
-            self.append_history('Launching Test Run!')
-        else:
-            self.append_history('Launching Run!')
-        
         self.stop_request = False
         self.diagnostics_on = False
+        self.final_plots = False
         self.running()
-        self.update_num_shots()
-        
-        if self.delay_type == 0:
-            self.append_history('Connecting to short delay stage')
-            self.delay = PIShortStageDelay(self.shortstage_t0)
-        if self.delay_type == 1:
-            self.append_history('Connecting to long delay stage')
-            self.delay = PILongStageDelay(self.longstage_t0)
-        if self.delay_type == 2:
-            self.append_history('Connecting to delay generator')
-            self.delay = InnolasPinkLaserDelay(self.pinklaser_t0)
-            
-        if self.delay.initialized is False:
-            self.append_history('Stage Not Initialized Correctly')
-            self.idling()
-            return
-        
-        success = self.delay.check_times(self.times)
-        if success is False:
-            self.message_time_points()
-            self.idling()
-            return
-        
-        self.append_history('Initializing Camera')
-        self.acquire_thread = QtCore.QThread()
-        self.acquire_thread.start()
-        
-        self.camera = StresingCameraVIS()
-        self.num_pixels = self.camera.num_pixels
-        self.camera.moveToThread(self.acquire_thread)
-        self.camera.start_acquire.connect(self.camera.Acquire)
-        self.camera.data_ready.connect(self.post_acquire_bgd)
-        
-        if self.ui.test_run_btn.isChecked() is False:
-            self.camera.Initialize(number_of_scans=self.num_shots*10,exposure_time_us=self.exp_time_us)##,use_ir_gain=self.ui.d_use_ir_gain.isChecked())
-            self.message_block()
-            self.append_history('Taking Background')
-            self.acquire_bgd()
-        else:
-            self.run()
-        return
-            
-    def run(self):
-        self.update_metadata()
-        self.current_sweep = SweepProcessing(self.times,self.num_pixels,self.filename,self.metadata)    
-        
-        self.camera.data_ready.disconnect(self.post_acquire_bgd)
-        self.camera.data_ready.connect(self.post_acquire)
-        self.camera.Initialize(number_of_scans=self.num_shots,exposure_time_us=self.exp_time_us)##,use_ir_gain=self.ui.d_use_ir_gain.isChecked())
-        
-        self.append_history('Starting Sweep '+str(self.current_sweep.sweep_index))
-        self.ui.sweep_display.display(self.current_sweep.sweep_index+1)
-        self.ui.progressBar.setMaximum(len(self.times))
-        self.start_sweep()
-        
-    def finish(self):
-        self.camera.Exit()
-        self.acquire_thread.quit()
-        self.idling()
+        # deal with markers
         try:
-            self.delay.close()
+            self.ui.a_spectrum_graph.removeItem(self.wavelength_marker)
         except:
             pass
+        try:
+            self.ui.a_kinetics_graph.removeItem(self.time_marker)
+        except:
+            pass
+        self.add_wavelength_marker()
+        # check that delay time is on stage!
+        success = self.delaystage.check_times(self.times)
+        if success is False:
+            self.message_time_points()
+            self.write_log('time point not on stage')
+            self.idling()
+            return
+        # apply current acquisition settings
+        self.apply_acquisition_settings()
+        # move acquisiton to separate thread
+        self.acquisition = Acquisition(self.camera)
+        self.acquire_thread = QtCore.QThread()
+        self.acquire_thread.start()
+        self.acquisition.moveToThread(self.acquire_thread)
+        # set up acquire signals
+        self.acquisition.start_acquire.connect(self.acquisition.acquire)
+        self.acquisition.data_ready.connect(self.post_acquire_bgd)
+        # run
+        self.message_block()
+        self.write_log('recording background')
+        self.acquire_bgd()
         return
+    
+    def add_wavelength_marker(self):
+        self.wavelength_marker = pg.InfiniteLine(self.central_wavelength, movable=True, bounds=[self.wavelengths[0], self.wavelengths[-1]])
+        self.ui.a_spectrum_graph.addItem(self.wavelength_marker)
+        self.wavelength_marker.sigPositionChangeFinished.connect(self.update_kinetics_wavelength)
+        self.wavelength_marker_label = pg.InfLineLabel(self.wavelength_marker, text='{value:.2f}nm', movable=True, position=0.9)
+        self.update_kinetics_wavelength()
+        return
+
+    def run(self):
+        self.update_metadata()
+        self.current_sweep = SweepProcessing(self.times, self.camera.num_pixels, self.filepath, self.metadata)    
+        # reset signals
+        self.acquisition.data_ready.disconnect(self.post_acquire_bgd)
+        self.acquisition.data_ready.connect(self.post_acquire)
         
+        self.write_log('starting sweep {0}'.format(self.current_sweep.sweep_index))
+        self.ui.a_current_sweep_lcd.display(self.current_sweep.sweep_index+1)
+        self.ui.a_sweep_progressbar.setMaximum(len(self.times))
+        self.ui.a_measurement_progressbar.setMaximum(len(self.times)*self.num_sweeps)
+        self.start_sweep()
+
+    def finish(self):
+        self.acquire_thread.quit()
+        self.final_plots = True
+        self.add_time_marker()
+        self.a_kinetics_plot()
+        self.a_spectrum_plot()
+        self.idling()
+        return
+    
     def start_sweep(self):
-        '''loop over number of timesteps in timefile and plots after acquisition'''
         self.timestep = 0
         self.time = self.times[self.timestep]
-        self.ui.time_display.display(self.time)
-        self.ui.progressBar.setValue(self.timestep+1)
+        self.ui.a_current_time_lcd.display(self.time)
+        self.ui.a_sweep_progressbar.setValue(self.timestep+1)
+        self.ui.a_measurement_progressbar.setValue(self.current_sweep.sweep_index*len(self.times)+self.timestep+1)
         self.move(self.time)
         self.acquire()
         return
         
     def post_sweep(self):
-        if self.ui.test_run_btn.isChecked() is False:
-            self.append_history('Saving Sweep '+str(self.current_sweep.sweep_index))
-            try:
-                self.current_sweep.save_current_data(self.waves)
-                self.current_sweep.save_avg_data(self.waves)
-                self.current_sweep.save_metadata_each_sweep(self.current_data.probe_on,
-                                                            self.current_data.reference_on,
-                                                            self.current_data.probe_shot_error)
-            except:
-                self.message_error_saving()
-        
+        self.write_log('saving sweep {0}'.format(self.current_sweep.sweep_index))
+        self.current_sweep.save_current_data(self.wavelengths)
+        self.current_sweep.save_avg_data(self.wavelengths)
         self.current_sweep.next_sweep()
-        
         if self.current_sweep.sweep_index == self.num_sweeps:
             self.finish()
         else:
-            self.append_history('Starting Sweep '+str(self.current_sweep.sweep_index))
-            self.ui.sweep_display.display(self.current_sweep.sweep_index+1)
+            self.write_log('starting sweep {0}'.format(self.current_sweep.sweep_index))
+            self.ui.a_current_sweep_lcd.display(self.current_sweep.sweep_index+1)
             self.start_sweep()
         return
-        
+   
     def exec_stop_btn(self):
-        '''stops acquisition from running'''
-        self.append_history('Stopped')
         self.stop_request=True
         return
-        
+  
     def exec_exit_btn(self):
-        '''will exit from gui. some safeguarding in case exit is called before stop'''
-        self.append_history('Stopped')
-        if self.idle is False:
-            self.finish()
-        self.save_gui_data()
-        self.close()
+        if self.safe_to_exit:
+            self.save_gui_values()
+            self.close()
+        else:
+            self.message_unsafe_exit() 
         return
-    """
     
     def move(self, new_time): 
         self.delaystage.move_to(new_time)
@@ -845,9 +732,12 @@ class Application(QtGui.QMainWindow):
         self.d_run()
         
     def d_post_single_acquisition(self, spectrum):
-        self.current_data = spectrum
+        self.current_spectrum = spectrum
         self.d_spectrum_plot()
         self.d_finish()
+        
+    def exec_d_abort_btn(self):
+        return
     
     def exec_d_run_btn(self):
         self.stop_request = False
@@ -880,7 +770,7 @@ class Application(QtGui.QMainWindow):
         self.acquisition.start_acquire.emit()
         
     def d_post_acquire(self, spectrum):
-        self.current_data = spectrum
+        self.current_spectrum = spectrum
         self.d_spectrum_plot()
         if self.stop_request is True:
             self.d_finish()
@@ -896,18 +786,14 @@ class Application(QtGui.QMainWindow):
     def exec_d_stop_btn(self):
         self.stop_request = True
         return
-    
-    """    
+       
     def exec_d_exit_btn(self):
-        '''will exit from gui - some safeguarding in case exit is called before stop'''
-        if self.idle is False:
-            self.d_finish()        
-        self.save_gui_data()
-        self.close()
+        if self.safe_to_exit:
+            self.save_gui_values()
+            self.close()
+        else:
+            self.message_unsafe_exit() 
         return
-        
-
-    """
 
         
 def main():
@@ -918,11 +804,9 @@ def main():
     
     # load the parameter values from last time and launch GUI
     last_instance_filename = 'last_instance_values.txt'
-    try:
-        last_instance_values = pd.read_csv(last_instance_filename, sep=':', header=None, index_col=0, squeeze=True)
-        ex = Application(last_instance_filename, last_instance_values=last_instance_values, preloaded=True)
-    except:
-        ex = Application(last_instance_filename)
+    last_instance_values = pd.read_csv(last_instance_filename, sep=':', header=None, index_col=0, squeeze=True)
+    
+    ex = Application(last_instance_filename, last_instance_values=last_instance_values, preloaded=True)
 
     ex.show()
     ex.create_plots()

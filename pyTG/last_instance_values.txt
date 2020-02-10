@@ -1,15 +1,15 @@
-exposure time:0.05
-accumulations:1
-gain:0
-gate delay:2840
-gate width:2
-time zero:10
-distribution:0
-tstart:-5
-tend:1000
-num tpoints:100
-num sweeps:1
-ordering:0
-central wavelength:600
-slit width:200
-wavelength monitored:600
+exposure time:0.1
+accumulations:1.0
+gain:0.0
+gate delay:2840.0
+gate width:2.0
+time zero:10.0
+distribution:1.0
+tstart:-5.0
+tend:100.0
+num tpoints:105.0
+num sweeps:10.0
+ordering:0.0
+central wavelength:600.0
+slit width:200.0
+wavelength monitored:600.0

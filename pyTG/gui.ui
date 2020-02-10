@@ -191,28 +191,28 @@
        <rect>
         <x>210</x>
         <y>10</y>
-        <width>461</width>
-        <height>351</height>
+        <width>471</width>
+        <height>321</height>
        </rect>
       </property>
      </widget>
      <widget class="PlotWidget" name="a_spectrum_graph">
       <property name="geometry">
        <rect>
-        <x>210</x>
-        <y>360</y>
-        <width>461</width>
-        <height>271</height>
+        <x>680</x>
+        <y>10</y>
+        <width>431</width>
+        <height>321</height>
        </rect>
       </property>
      </widget>
      <widget class="PlotWidget" name="a_kinetics_graph">
       <property name="geometry">
        <rect>
-        <x>670</x>
-        <y>10</y>
-        <width>441</width>
-        <height>351</height>
+        <x>210</x>
+        <y>330</y>
+        <width>471</width>
+        <height>301</height>
        </rect>
       </property>
      </widget>
@@ -799,7 +799,7 @@
       <property name="geometry">
        <rect>
         <x>710</x>
-        <y>390</y>
+        <y>380</y>
         <width>371</width>
         <height>211</height>
        </rect>
@@ -981,7 +981,7 @@
         <x>10</x>
         <y>10</y>
         <width>191</width>
-        <height>181</height>
+        <height>221</height>
        </rect>
       </property>
       <property name="title">
@@ -1154,6 +1154,22 @@
         <string>Single Acquisition</string>
        </property>
       </widget>
+      <widget class="QPushButton" name="d_abort_btn">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>180</y>
+         <width>171</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(255, 0, 0);</string>
+       </property>
+       <property name="text">
+        <string>Abort Acquisition</string>
+       </property>
+      </widget>
      </widget>
      <widget class="QGroupBox" name="d_launch_box">
       <property name="geometry">
@@ -1220,9 +1236,9 @@
       <property name="geometry">
        <rect>
         <x>210</x>
-        <y>80</y>
+        <y>10</y>
         <width>901</width>
-        <height>471</height>
+        <height>541</height>
        </rect>
       </property>
      </widget>
@@ -1230,7 +1246,7 @@
       <property name="geometry">
        <rect>
         <x>10</x>
-        <y>200</y>
+        <y>240</y>
         <width>191</width>
         <height>151</height>
        </rect>
@@ -1361,45 +1377,6 @@
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-     </widget>
-     <widget class="QGroupBox" name="d_display_settings_box">
-      <property name="geometry">
-       <rect>
-        <x>210</x>
-        <y>10</y>
-        <width>901</width>
-        <height>61</height>
-       </rect>
-      </property>
-      <property name="title">
-       <string>Display Settings</string>
-      </property>
-      <widget class="QCheckBox" name="d_autoscale_checkbox">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>30</y>
-         <width>85</width>
-         <height>21</height>
-        </rect>
-       </property>
-       <property name="text">
-        <string>Autoscale</string>
-       </property>
-      </widget>
-      <widget class="QPushButton" name="d_rescale_button">
-       <property name="geometry">
-        <rect>
-         <x>100</x>
-         <y>30</y>
-         <width>80</width>
-         <height>23</height>
-        </rect>
-       </property>
-       <property name="text">
-        <string>Rescale</string>
        </property>
       </widget>
      </widget>

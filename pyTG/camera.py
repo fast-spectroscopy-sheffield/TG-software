@@ -28,7 +28,7 @@ class Camera(QObject):
         self.dll = None  # ct.WinDLL(os.path.join())
         self.temperature_setpoint = -30.0
         self.num_pixels = 1024
-        self.data = np.zeros((self.num_pixels, 2))
+        self.data = np.zeros(self.num_pixels)
         self.exposure_time = 0.05
         self.gain = 0
         self.num_accumulations = 1
@@ -99,10 +99,9 @@ class Camera(QObject):
     
     def single_acquisition(self):
         time.sleep(self.exposure_time)
-        x = np.linspace(505, 805, self.num_pixels)
-        y = 1e4*(np.exp(-((x-640)**2)/(2*40**2)) + 0.3*(np.random.rand(self.num_pixels)-0.5))
-        self.data[:, 0] = x
-        self.data[:, 1] = y
+        x = np.linspace(0, self.num_pixels, self.num_pixels, endpoint=False)
+        y = 1e4*(np.exp(-((x-600)**2)/(2*40**2)) + 0.3*(np.random.rand(self.num_pixels)-0.5))
+        self.data[:] = y
         return
     
     def ccdexit(self):

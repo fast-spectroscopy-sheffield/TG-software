@@ -39,7 +39,7 @@ class SweepProcessing:
     def save_current_data(self, wavelengths):
         save_data = np.vstack((np.hstack((0, wavelengths)),
                                np.hstack((self.times.T, self.current_data))))
-        with h5py.File(self.hdf5_filename) as hdf5_file:
+        with h5py.File(self.hdf5_filename, mode='a') as hdf5_file:
             dset = hdf5_file.create_dataset('Sweeps/Sweep_'+str(self.sweep_index), data=save_data)
             dset.attrs['date'] = str(dt.datetime.now().date()).encode('ascii', 'ignore')
             dset.attrs['time'] = str(dt.datetime.now().time()).encode('ascii', 'ignore')
@@ -48,7 +48,7 @@ class SweepProcessing:
     def save_avg_data(self, wavelengths):
         save_data = np.vstack((np.hstack((0, wavelengths)),
                                np.hstack((self.times.T, self.avg_data))))
-        with h5py.File(self.hdf5_filename) as hdf5_file:
+        with h5py.File(self.hdf5_filename, mode='a') as hdf5_file:
             try:
                 dset = hdf5_file['Average']
                 dset[:, :] = save_data
@@ -66,7 +66,7 @@ class SweepProcessing:
         return
         
     def save_metadata_initial(self):
-        with h5py.File(self.hdf5_filename) as hdf5_file:
+        with h5py.File(self.hdf5_filename, mode='a') as hdf5_file:
             data = np.zeros((1, 1))
             dset = hdf5_file.create_dataset('Metadata', data=data)
             for key, item in self.metadata.items():
