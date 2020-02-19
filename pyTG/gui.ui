@@ -30,7 +30,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>2</number>
+     <number>1</number>
     </property>
     <widget class="QWidget" name="hardware_tab">
      <attribute name="title">
@@ -597,7 +597,7 @@
         </rect>
        </property>
        <property name="minimum">
-        <number>2</number>
+        <number>40</number>
        </property>
        <property name="maximum">
         <number>1000</number>
@@ -798,10 +798,10 @@
      <widget class="QGroupBox" name="a_measurement_box">
       <property name="geometry">
        <rect>
-        <x>710</x>
-        <y>380</y>
+        <x>720</x>
+        <y>400</y>
         <width>371</width>
-        <height>211</height>
+        <height>181</height>
        </rect>
       </property>
       <property name="title">
@@ -811,7 +811,7 @@
        <property name="geometry">
         <rect>
          <x>10</x>
-         <y>180</y>
+         <y>150</y>
          <width>151</width>
          <height>21</height>
         </rect>
@@ -824,7 +824,7 @@
        <property name="geometry">
         <rect>
          <x>10</x>
-         <y>150</y>
+         <y>120</y>
          <width>151</width>
          <height>21</height>
         </rect>
@@ -837,7 +837,7 @@
        <property name="geometry">
         <rect>
          <x>170</x>
-         <y>180</y>
+         <y>150</y>
          <width>191</width>
          <height>23</height>
         </rect>
@@ -850,7 +850,7 @@
        <property name="geometry">
         <rect>
          <x>170</x>
-         <y>150</y>
+         <y>120</y>
          <width>191</width>
          <height>23</height>
         </rect>
@@ -863,7 +863,7 @@
        <property name="geometry">
         <rect>
          <x>10</x>
-         <y>120</y>
+         <y>90</y>
          <width>141</width>
          <height>21</height>
         </rect>
@@ -876,7 +876,7 @@
        <property name="geometry">
         <rect>
          <x>170</x>
-         <y>120</y>
+         <y>90</y>
          <width>71</width>
          <height>23</height>
         </rect>
@@ -889,7 +889,7 @@
        <property name="geometry">
         <rect>
          <x>10</x>
-         <y>90</y>
+         <y>60</y>
          <width>141</width>
          <height>21</height>
         </rect>
@@ -902,7 +902,7 @@
        <property name="geometry">
         <rect>
          <x>170</x>
-         <y>90</y>
+         <y>60</y>
          <width>71</width>
          <height>23</height>
         </rect>
@@ -911,24 +911,11 @@
         <string notr="true">background-color: rgb(255, 255, 255);</string>
        </property>
       </widget>
-      <widget class="QLabel" name="label">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>30</y>
-         <width>141</width>
-         <height>21</height>
-        </rect>
-       </property>
-       <property name="text">
-        <string>Wavelength Monitored</string>
-       </property>
-      </widget>
       <widget class="QLabel" name="label_2">
        <property name="geometry">
         <rect>
          <x>10</x>
-         <y>60</y>
+         <y>30</y>
          <width>141</width>
          <height>21</height>
         </rect>
@@ -941,7 +928,7 @@
        <property name="geometry">
         <rect>
          <x>170</x>
-         <y>60</y>
+         <y>30</y>
          <width>71</width>
          <height>23</height>
         </rect>
@@ -951,22 +938,6 @@
        </property>
        <property name="segmentStyle">
         <enum>QLCDNumber::Filled</enum>
-       </property>
-      </widget>
-      <widget class="QDoubleSpinBox" name="a_kinetic_wavelength_sb">
-       <property name="geometry">
-        <rect>
-         <x>170</x>
-         <y>30</y>
-         <width>71</width>
-         <height>24</height>
-        </rect>
-       </property>
-       <property name="maximum">
-        <double>1200.000000000000000</double>
-       </property>
-       <property name="value">
-        <double>600.000000000000000</double>
        </property>
       </widget>
      </widget>

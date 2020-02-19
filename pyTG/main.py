@@ -39,6 +39,8 @@ class Application(QtGui.QMainWindow):
         self.ui.setupUi(self)
         self.setWindowIcon(QtGui.QIcon('icon.png'))
         self.ui.tabs.setCurrentIndex(0)
+        self.ui.diagnostics_tab.setEnabled(False)
+        self.ui.acquisition_tab.setEnabled(False)
         self.show()
         self.last_instance_filename = last_instance_filename
         self.last_instance_values = last_instance_values
@@ -67,7 +69,8 @@ class Application(QtGui.QMainWindow):
         self.ui.a_distribution_cb.addItem('Exponential')
         self.ui.a_distribution_cb.addItem('Linear')
         self.ui.a_ordering_cb.addItem('Linear')
-        self.ui.a_ordering_cb.addItem('Random')
+        #self.ui.a_ordering_cb.addItem('Random')
+        return
         
     def setup_gui_connections(self):
         # hardware tab
@@ -127,6 +130,8 @@ class Application(QtGui.QMainWindow):
     def initialise_gui_values(self):
         self.ui.h_iCCD_status.setText('ready to connect')
         self.ui.h_delaystage_status.setText('ready to connect')
+        self.ui.h_iCCD_disconnect_btn.setEnabled(False)
+        self.ui.h_delaystage_disconnect_btn.setEnabled(False)
         self.ui.d_current_time_sb.setValue(0)
         self.ui.a_sweep_progressbar.setValue(0)
         self.ui.a_measurement_progressbar.setValue(0)
@@ -146,7 +151,6 @@ class Application(QtGui.QMainWindow):
             self.ui.a_ordering_cb.setCurrentIndex(self.last_instance_values['ordering'])
             self.ui.d_central_wavelength_sb.setValue(self.last_instance_values['central wavelength'])
             self.ui.d_slitwidth_sb.setValue(self.last_instance_values['slit width'])
-            self.ui.a_kinetic_wavelength_sb.setValue(self.last_instance_values['wavelength monitored'])
         else:
             self.ui.a_exp_time_sb.setValue(0.05)
             self.ui.a_num_accum_sb.setValue(1)
@@ -162,7 +166,6 @@ class Application(QtGui.QMainWindow):
             self.ui.a_ordering_cb.setCurrentIndex(0)
             self.ui.d_central_wavelength_sb.setValue(600)
             self.ui.d_slitwidth_sb.setValue(200)
-            self.ui.a_kinetic_wavelength_sb.setValue(600)
         return
         
     def update_gui_values(self):
@@ -198,8 +201,8 @@ class Application(QtGui.QMainWindow):
         self.last_instance_values['ordering'] = self.ui.a_ordering_cb.currentIndex()
         self.last_instance_values['central wavelength'] = self.ui.d_central_wavelength_sb.value()
         self.last_instance_values['slit width'] = self.ui.d_slitwidth_sb.value()
-        self.last_instance_values['wavelength monitored'] = self.ui.a_kinetic_wavelength_sb.value()
         self.last_instance_values.to_csv(self.last_instance_filename, sep=':', header=False)
+        return
         
     def update_a_exp_time(self):
         self.exp_time = self.ui.a_exp_time_sb.value()
@@ -253,6 +256,10 @@ class Application(QtGui.QMainWindow):
     
     def update_times(self):
         distribution = self.ui.a_distribution_cb.currentText()
+        if distribution == 'Linear':
+            self.ui.a_num_points_sb.setMinimum(5)
+        else:
+            self.ui.a_num_points_sb.setMinimum(25)
         start_time = self.ui.a_start_time_sb.value()
         end_time = self.ui.a_end_time_sb.value()
         num_points = self.ui.a_num_points_sb.value()
@@ -282,14 +289,9 @@ class Application(QtGui.QMainWindow):
         self.metadata['pump wavelength'] = self.ui.a_pump_wl_le.text()
         self.metadata['pump power'] = self.ui.a_pump_power_le.text()
         self.metadata['pump spot size'] = self.ui.a_spot_size_le.text()
-    """    
-    def update_kinetics_wavelength(self):
-        self.kinetics_wavelength = self.ui.a_kinetic_wavelength_sb.value()
-        if self.camera_connected:
-            kinetics_pixel = int(self.camera.num_pixels*((self.kinetics_wavelength-self.wavelengths[0])/(self.wavelengths[-1]-self.wavelengths[0])))
-            self.kinetics_pixel = 0 if kinetics_pixel < 0 else kinetics_pixel
+        # add more fields here
         return
-    """
+
     def update_kinetics_wavelength(self):
         self.kinetics_wavelength = self.wavelength_marker.value()
         self.kinetics_pixel = int(self.camera.num_pixels*((self.kinetics_wavelength-self.wavelengths[0])/(self.wavelengths[-1]-self.wavelengths[0])))
@@ -302,6 +304,7 @@ class Application(QtGui.QMainWindow):
         self.time_pixel = np.where((self.times-self.spectrum_time)**2 == min((self.times-self.spectrum_time)**2))[0][0]
         if self.final_plots:
             self.a_spectrum_plot()
+        return
     
     def update_central_wavelength(self):
         self.central_wavelength = self.ui.d_central_wavelength_sb.value()
@@ -370,8 +373,10 @@ class Application(QtGui.QMainWindow):
         self.ui.d_temperature_lcd.display(current_temperature)
         self.ui.a_temperature_lcd.setStyleSheet('QLCDNumber{background-color: rgb'+lcd_colour+';}')
         self.ui.a_temperature_lcd.display(current_temperature)
+        return
     
     def exec_h_camera_connect_btn(self):
+        self.ui.h_iCCD_connect_btn.setEnabled(False)
         self.ui.h_iCCD_status.setText('establishing connection ...')
         self.camera = Camera()
         self.ui.h_iCCD_status.setText('cooling down iCCD - please wait ...')
@@ -386,9 +391,17 @@ class Application(QtGui.QMainWindow):
         self.camera_connected = True
         self.safe_to_exit = False
         self.update_central_wavelength()
+        if self.delaystage_connected:
+            self.ui.acquisition_tab.setEnabled(True)
+            self.ui.diagnostics_tab.setEnabled(True)
+        self.ui.h_iCCD_disconnect_btn.setEnabled(True)
         self.ui.h_iCCD_status.setText('ready')
+        return
         
     def exec_h_camera_disconnect_btn(self):
+        self.ui.acquisition_tab.setEnabled(False)
+        self.ui.diagnostics_tab.setEnabled(False)
+        self.ui.h_iCCD_disconnect_btn.setEnabled(False)
         self.ui.h_iCCD_status.setText('warming up iCCD - please wait ...')
         self.camera.start_warmup()
         current_temperature = self.camera.get_temperature()
@@ -398,9 +411,11 @@ class Application(QtGui.QMainWindow):
         self.ui.h_iCCD_status.setText('disconnecting ...')
         self.camera.ccdexit()
         self.camera_connected = False
+        self.ui.h_iCCD_connect_btn.setEnabled(True)
         self.ui.h_iCCD_status.setText('ready to connect')
         if not self.delaystage_connected:
             self.safe_to_exit = True
+        return
         
     def apply_acquisition_settings(self):
         self.camera.exposure_time = self.exp_time
@@ -411,11 +426,8 @@ class Application(QtGui.QMainWindow):
         self.camera.apply_acquisition_settings()
         return
     
-    def update_h_stage_position(self, current_position):
-        self.ui.h_delaystage_position_lcd.display(current_position)
-        return
-    
     def exec_h_delaystage_connect_btn(self):
+        self.ui.h_delaystage_connect_btn.setEnabled(False)
         self.ui.h_delaystage_status.setText('establishing connection ...')
         self.delaystage = DelayStage(self.time_zero)
         self.ui.h_delaystage_status.setText('referencing - please wait ...')
@@ -425,15 +437,25 @@ class Application(QtGui.QMainWindow):
         self.ui.h_delaystage_status.setText('moving to previous time zero - please wait ...')
         self.delaystage.move_to(0)
         self.delaystage_connected = True
+        if self.camera_connected:
+            self.ui.acquisition_tab.setEnabled(True)
+            self.ui.diagnostics_tab.setEnabled(True)
+        self.ui.h_delaystage_disconnect_btn.setEnabled(True)
         self.ui.h_delaystage_status.setText('ready')
+        return
         
     def exec_h_delaystage_disconnect_btn(self):
+        self.ui.acquisition_tab.setEnabled(False)
+        self.ui.diagnostics_tab.setEnabled(False)
+        self.ui.h_delaystage_disconnect_btn.setEnabled(False)
         self.ui.h_delaystage_status.setText('closing connection ...')
         self.delaystage.close()
         self.delaystage_connected = False
+        self.ui.h_delaystage_connect_btn.setEnabled(True)
         self.ui.h_delaystage_status.setText('ready to connect')
         if not self.camera_connected:
             self.safe_to_exit = True
+        return
       
     def create_plots(self):
         self.ui.a_spectrum_graph.plotItem.setLabels(left='PL (counts)', bottom='Wavelength (nm)')
@@ -490,6 +512,7 @@ class Application(QtGui.QMainWindow):
         self.time_marker.sigPositionChangeFinished.connect(self.update_time_pixel)
         self.time_marker_label = pg.InfLineLabel(self.time_marker, text='{value:.2f}ps', movable=True, position=0.9)
         self.update_time_pixel()
+        return
         
     def message_block(self):
         msg = QtGui.QMessageBox()
@@ -535,12 +558,33 @@ class Application(QtGui.QMainWindow):
     
     def running(self):
         self.idle = False
-        # enable / disable stuff
+        self.write_app_status('running', 'green')
+        self.ui.hardware_tab.setEnabled(False)
+        self.ui.a_acquisition_settings_box.setEnabled(False)
+        self.ui.a_time_box.setEnabled(False)
+        self.ui.a_metadata_box.setEnabled(False)
+        self.ui.a_file_box.setEnabled(False)
+        self.ui.a_run_btn.setEnabled(False)
+        self.ui.d_acquisition_settings_box.setEnabled(False)
+        self.ui.d_run_btn.setEnabled(False)
+        self.ui.d_spectrograph_settings_box.setEnabled(False)
+        if not self.diagnostics_on:
+            self.ui.d_time_box.setEnabled(False)
         return
             
     def idling(self):
         self.idle = True
-        # enable / disable stuff
+        self.write_app_status('idling', 'blue')
+        self.ui.hardware_tab.setEnabled(True)
+        self.ui.a_acquisition_settings_box.setEnabled(True)
+        self.ui.a_time_box.setEnabled(True)
+        self.ui.a_metadata_box.setEnabled(True)
+        self.ui.a_file_box.setEnabled(True)
+        self.ui.a_run_btn.setEnabled(True)
+        self.ui.d_acquisition_settings_box.setEnabled(True)
+        self.ui.d_run_btn.setEnabled(True)
+        self.ui.d_spectrograph_settings_box.setEnabled(True)
+        self.ui.d_time_box.setEnabled(True)
         return
 
     def acquire(self):
@@ -640,6 +684,7 @@ class Application(QtGui.QMainWindow):
         self.ui.a_sweep_progressbar.setMaximum(len(self.times))
         self.ui.a_measurement_progressbar.setMaximum(len(self.times)*self.num_sweeps)
         self.start_sweep()
+        return
 
     def finish(self):
         self.acquire_thread.quit()
@@ -730,11 +775,13 @@ class Application(QtGui.QMainWindow):
         self.acquisition.data_ready.connect(self.d_post_single_acquisition)
         # run
         self.d_run()
+        return
         
     def d_post_single_acquisition(self, spectrum):
         self.current_spectrum = spectrum
         self.d_spectrum_plot()
         self.d_finish()
+        return
         
     def exec_d_abort_btn(self):
         return
@@ -761,13 +808,16 @@ class Application(QtGui.QMainWindow):
         self.acquisition.data_ready.connect(self.d_post_acquire)
         # run
         self.d_run()
+        return
         
     def d_run(self):
         self.d_move_to_time()
         self.d_acquire()
+        return
     
     def d_acquire(self):
         self.acquisition.start_acquire.emit()
+        return
         
     def d_post_acquire(self, spectrum):
         self.current_spectrum = spectrum
