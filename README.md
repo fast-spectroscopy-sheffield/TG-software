@@ -2,8 +2,8 @@
 Software for the transient grating PL setup.
 
 ### to-do list
- - make the gui idiot proof
- - extensive crash testing
+ - fix bug with pyqtgraph log scale on kinetics plot
+ - more crash testing
  - test on Windows 10
  - write and test real hardware classes
  - connect real hardware classes to gui
