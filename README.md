@@ -2,7 +2,7 @@
 Software for the transient grating PL setup.
 
 ### to-do list
- - fix bug with pyqtgraph log scale on kinetics plot
+ - option to log scale the x-axis of kinetic plot (possibly tricky in pyqtgraph)
  - more crash testing
  - test on Windows 10
  - write and test real hardware classes
