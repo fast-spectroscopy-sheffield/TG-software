@@ -6,6 +6,7 @@ write some stuff here about versions, contacts etc and code layout
 import sys
 import os
 from PyQt5 import QtGui, QtCore
+from PyQt5.QtCore import pyqtSlot
 
 # gui object
 from gui import Ui_pyTGgui as pyTGgui
@@ -591,6 +592,7 @@ class Application(QtGui.QMainWindow):
         self.acquisition.start_acquire.emit()
         return
    
+    @pyqtSlot(np.ndarray)
     def post_acquire(self, spectrum):
         self.current_spectrum = spectrum#-self.bgd
         self.current_sweep.add_current_data(self.current_spectrum, self.timestep)
@@ -620,6 +622,7 @@ class Application(QtGui.QMainWindow):
         self.acquisition.start_acquire.emit()
         return
         
+    @pyqtSlot(np.ndarray)
     def post_acquire_bgd(self, spectrum):
         self.bgd = spectrum
         self.message_unblock()
@@ -819,6 +822,7 @@ class Application(QtGui.QMainWindow):
         self.acquisition.start_acquire.emit()
         return
         
+    @pyqtSlot(np.ndarray)
     def d_post_acquire(self, spectrum):
         self.current_spectrum = spectrum
         self.d_spectrum_plot()
