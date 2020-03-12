@@ -21,8 +21,8 @@ import numpy as np
 import pandas as pd
 
 # hardware
-from camera import Camera, Acquisition
-from delay import DelayStage
+from camera_test import Camera, Acquisition
+from delay_test import DelayStage
 
 # sweep processing
 from sweeps import SweepProcessing
